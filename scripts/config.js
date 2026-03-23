@@ -14,17 +14,42 @@ const DEFAULT_CONFIG = {
   wechat_secret: ''
 };
 
+const CONFIG_LABELS = {
+  brave_api_key: {
+    name: 'Brave Search API Key',
+    desc: '用于搜索文章素材',
+    help: '获取方式：https://brave.com/search/api/',
+    required: true
+  },
+  doubao_api_key: {
+    name: '豆包 API Key',
+    desc: '用于生成文章封面图',
+    help: '获取方式：https://www.volcengine.com/ → 豆包大模型',
+    required: true
+  },
+  wechat_appid: {
+    name: '微信公众号 AppID',
+    desc: '用于自动发布文章（可选）',
+    help: '获取方式：微信公众平台 → 开发 → 基本配置',
+    required: false
+  },
+  wechat_secret: {
+    name: '微信公众号 Secret',
+    desc: '用于自动发布文章（可选）',
+    help: '获取方式：微信公众平台 → 开发 → 基本配置',
+    required: false
+  }
+};
+
 /**
  * 获取用户配置文件路径
- * @param {string} userId - 用户 ID（如 Telegram user_id）
+ * @param {string} userId - 用户 ID
  * @returns {string} 配置文件路径
  */
 function getUserConfigPath(userId) {
-  // 清理用户 ID，防止路径遍历攻击
   const safeUserId = String(userId).replace(/[^a-zA-Z0-9_-]/g, '_');
   const userDir = path.join(CONFIG_DIR, `user_${safeUserId}`);
   
-  // 确保用户目录存在
   if (!fs.existsSync(userDir)) {
     fs.mkdirSync(userDir, { recursive: true });
   }
@@ -94,58 +119,143 @@ function setUserConfig(userId, key, value) {
 /**
  * 检查指定用户的配置是否完整
  * @param {string} userId - 用户 ID
- * @returns {Array} 缺失的配置项列表
+ * @returns {Array} 缺失的必需配置项列表
  */
 function checkUserConfig(userId) {
   const config = loadUserConfig(userId);
-  const required = ['brave_api_key', 'doubao_api_key', 'wechat_appid', 'wechat_secret'];
+  const required = Object.keys(CONFIG_LABELS).filter(key => CONFIG_LABELS[key].required);
   return required.filter(key => !config[key]);
 }
 
 /**
- * 确保配置完整（交互式）
+ * 检查用户是否是首次使用
  * @param {string} userId - 用户 ID
- * @param {Function} askUser - 询问用户的函数
- * @returns {Promise<Object>} 配置对象
+ * @returns {boolean} 是否首次使用
  */
-async function ensureUserConfig(userId, askUser) {
-  const missing = checkUserConfig(userId);
+function isFirstTime(userId) {
+  const configPath = getUserConfigPath(userId);
+  return !fs.existsSync(configPath);
+}
+
+/**
+ * 获取用户配置状态
+ * @param {string} userId - 用户 ID
+ * @returns {Object} 配置状态
+ */
+function getUserConfigStatus(userId) {
   const config = loadUserConfig(userId);
+  const missing = checkUserConfig(userId);
+  const isFirst = isFirstTime(userId);
   
-  if (missing.length === 0) {
-    return { ok: true, config, missing: [] };
+  return {
+    isFirstTime: isFirst,
+    isComplete: missing.length === 0,
+    missing: missing,
+    config: config,
+    missingLabels: missing.map(key => CONFIG_LABELS[key])
+  };
+}
+
+/**
+ * 生成配置引导消息
+ * @param {string} userId - 用户 ID
+ * @returns {string} 引导消息
+ */
+function generateConfigWelcome(userId) {
+  const status = getUserConfigStatus(userId);
+  
+  if (status.isFirstTime) {
+    return `👋 欢迎使用微信公众号自动化发布工具！
+
+📝 首次使用需要配置以下 API Key：
+
+1️⃣ **Brave Search API Key** - 用于搜索文章素材
+   💡 获取：https://brave.com/search/api/
+
+2️⃣ **豆包 API Key** - 用于生成文章封面图
+   💡 获取：https://www.volcengine.com/
+
+配置完成后，您就可以：
+✨ 输入主题 → AI 自动写作 → 生成封面 → 发布公众号
+
+请输入 **Brave Search API Key**：`;
   }
   
-  console.log(`⚠️ 用户 ${userId} 首次使用，需要配置 API Key`);
-  console.log(`缺少: ${missing.join(', ')}`);
+  if (!status.isComplete) {
+    const missing = status.missingLabels.map((item, i) => 
+      `${i + 1}. **${item.name}** - ${item.desc}`
+    ).join('\n');
+    
+    return `⚠️ 您的配置不完整，还缺少：
+
+${missing}
+
+请输入缺失的配置项：`;
+  }
   
-  // 询问用户输入
-  for (const key of missing) {
-    const label = {
-      brave_api_key: 'Brave Search API Key (用于搜索素材)',
-      doubao_api_key: '豆包 API Key (用于生成封面)',
-      wechat_appid: '微信公众号 AppID (用于自动发布，可选)',
-      wechat_secret: '微信公众号 Secret (用于自动发布，可选)'
-    }[key];
+  return '✅ 您的配置已完成！可以直接使用所有功能。';
+}
+
+/**
+ * 交互式配置引导
+ * @param {string} userId - 用户 ID
+ * @param {Function} sendMessage - 发送消息函数
+ * @param {Function} waitForReply - 等待用户回复函数
+ * @returns {Promise<Object>} 配置结果
+ */
+async function interactiveConfig(userId, sendMessage, waitForReply) {
+  const config = loadUserConfig(userId);
+  const keys = Object.keys(CONFIG_LABELS);
+  
+  await sendMessage(generateConfigWelcome(userId));
+  
+  for (const key of keys) {
+    const label = CONFIG_LABELS[key];
     
-    const value = await askUser(`${label}: `);
-    config[key] = value.trim();
+    // 如果已有值且是可选的，询问是否更新
+    if (config[key] && !label.required) {
+      await sendMessage(`\n${label.name} 已配置，是否需要更新？（回复"跳过"保留原值，或直接输入新值）`);
+    } else if (!config[key]) {
+      // 需要输入
+      await sendMessage(`\n📌 **${label.name}**\n${label.desc}\n${label.help}\n\n请输入（回复"跳过"可暂时跳过）：`);
+    } else {
+      continue; // 已有必需值，跳过
+    }
     
-    // 提示获取方式
-    if (key === 'brave_api_key') {
-      console.log('💡 获取方式：https://brave.com/search/api/');
-    } else if (key === 'doubao_api_key') {
-      console.log('💡 获取方式：https://www.volcengine.com/ → 豆包大模型');
-    } else if (key === 'wechat_secret') {
-      console.log('💡 获取方式：微信公众平台 → 开发 → 基本配置');
+    const reply = await waitForReply();
+    
+    if (reply && reply.toLowerCase() !== '跳过' && reply.trim()) {
+      config[key] = reply.trim();
+      saveUserConfig(userId, config);
+      await sendMessage(`✅ ${label.name} 已保存`);
+    } else if (!config[key] && label.required) {
+      await sendMessage(`⚠️ ${label.name} 是必需的，后续可以再次配置`);
     }
   }
   
-  // 保存配置
-  saveUserConfig(userId, config);
-  console.log('\n✅ 配置已保存！');
+  const status = getUserConfigStatus(userId);
   
-  return { ok: true, config, missing: [] };
+  if (status.isComplete) {
+    await sendMessage(`\n🎉 配置完成！您现在可以：\n\n✍️ 发送 "帮我写一篇关于 XXX 的公众号文章" 开始创作`);
+  } else {
+    await sendMessage(`\n⚠️ 配置尚未完成，缺少：${status.missing.map(k => CONFIG_LABELS[k].name).join(', ')}\n\n您可以继续使用基础功能，或发送 "配置" 继续完善。`);
+  }
+  
+  return { ok: status.isComplete, config, missing: status.missing };
+}
+
+/**
+ * 快速配置（一次性输入）
+ * @param {string} userId - 用户 ID
+ * @param {Object} configData - 配置数据对象
+ * @returns {Object} 配置结果
+ */
+function quickConfig(userId, configData) {
+  const config = { ...DEFAULT_CONFIG, ...configData };
+  saveUserConfig(userId, config);
+  
+  const status = getUserConfigStatus(userId);
+  return { ok: status.isComplete, config, missing: status.missing };
 }
 
 /**
@@ -186,7 +296,7 @@ function deleteUserConfig(userId) {
   }
 }
 
-// 向后兼容：单用户模式（使用默认用户）
+// 向后兼容：单用户模式
 const DEFAULT_USER = 'default';
 
 const compat = {
@@ -195,15 +305,8 @@ const compat = {
   getConfig: (key) => getUserConfig(DEFAULT_USER, key),
   setConfig: (key, value) => setUserConfig(DEFAULT_USER, key, value),
   checkConfig: () => checkUserConfig(DEFAULT_USER),
-  ensureConfig: async function() {
-    const missing = checkUserConfig(DEFAULT_USER);
-    const config = loadUserConfig(DEFAULT_USER);
-    return { ok: missing.length === 0, config, missing };
-  },
-  initConfigInteractive: async function() {
-    console.log('请使用多租户版本：ensureUserConfig(userId, askUser)');
-    throw new Error('单用户模式已弃用，请使用多租户 API');
-  }
+  getConfigStatus: () => getUserConfigStatus(DEFAULT_USER),
+  interactiveConfig: async (send, wait) => interactiveConfig(DEFAULT_USER, send, wait)
 };
 
 module.exports = {
@@ -214,11 +317,16 @@ module.exports = {
   getUserConfig,
   setUserConfig,
   checkUserConfig,
-  ensureUserConfig,
+  getUserConfigStatus,
+  isFirstTime,
+  generateConfigWelcome,
+  interactiveConfig,
+  quickConfig,
   getAllUsers,
   deleteUserConfig,
+  CONFIG_LABELS,
   
-  // 向后兼容（单用户模式）
+  // 向后兼容
   ...compat,
   
   // 常量

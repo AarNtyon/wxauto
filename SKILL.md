@@ -46,22 +46,43 @@ const userId = `telegram_${message.from.id}`;  // 如：telegram_12345678
 
 ### Step 2: 检查并引导配置
 
+**首次使用配置引导：**
+
 ```javascript
-const { ensureUserConfig } = require('/Users/an/code/wxauto/scripts/config');
+const { 
+  getUserConfigStatus, 
+  interactiveConfig 
+} = require('/Users/an/code/wxauto/scripts/config');
 
-// 检查用户配置，如缺失则引导输入
-const result = await ensureUserConfig(userId, async (prompt) => {
-  // 向用户发送提示，获取输入
-  return await askUser(prompt);
-});
+// 检查用户配置状态
+const status = getUserConfigStatus(userId);
 
-if (!result.ok) {
-  console.log(`用户 ${userId} 配置不完整`);
-  return;
+if (status.isFirstTime) {
+  // 首次使用，显示欢迎消息并引导配置
+  await sendMessage(generateConfigWelcome(userId));
+  
+  // 交互式配置
+  const result = await interactiveConfig(
+    userId,
+    async (msg) => await sendMessage(msg),     // 发送消息
+    async () => await waitForUserReply()        // 等待用户输入
+  );
+  
+  if (!result.ok) {
+    console.log(`用户 ${userId} 配置未完成`);
+    return;
+  }
 }
 
 console.log(`✅ 用户 ${userId} 配置完成`);
 ```
+
+**配置引导流程：**
+
+1. **首次使用**：显示欢迎消息，说明需要配置的 API Key
+2. **逐个询问**：依次询问 Brave Key、豆包 Key、微信公众号（可选）
+3. **保存确认**：每输入一个保存一个，显示确认消息
+4. **完成提示**：配置完成后提示用户可以开始使用
 
 ### Step 3: 确认主题
 
