@@ -1,0 +1,6 @@
+{
+  "wechat_appid": "wx_你的appid",
+  "wechat_secret": "你的secret",
+  "doubao_api_key": "豆包api_key",
+  "brave_api_key": "brave_api_key"
+}

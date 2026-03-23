@@ -1,0 +1,156 @@
+/**
+ * 科技风主题 - 适合技术类文章
+ * 特点：深色边框、代码高亮、现代感
+ */
+
+/* 基础 */
+.tech-theme {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.8;
+  color: #2c3e50;
+  max-width: 100%;
+  padding: 20px;
+}
+
+/* 标题 */
+.tech-theme h1 {
+  font-size: 26px;
+  font-weight: 700;
+  color: #1a1a2e;
+  text-align: center;
+  margin: 0 0 20px 0;
+  padding: 0 0 15px 0;
+  border-bottom: 3px solid #16213e;
+}
+
+.tech-theme h2 {
+  font-size: 21px;
+  font-weight: 600;
+  color: #16213e;
+  margin: 30px 0 15px 0;
+  padding: 10px 0 10px 15px;
+  border-left: 5px solid #0f3460;
+  background: linear-gradient(90deg, #f8f9fa 0%, transparent 100%);
+}
+
+.tech-theme h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin: 25px 0 12px 0;
+}
+
+/* 段落 */
+.tech-theme p {
+  margin: 16px 0;
+  text-align: justify;
+  color: #2c3e50;
+}
+
+/* 引用块 */
+.tech-theme blockquote {
+  margin: 20px 0;
+  padding: 15px 20px;
+  background: #f8f9fa;
+  border-left: 5px solid #0f3460;
+  color: #555;
+  font-style: italic;
+  border-radius: 0 8px 8px 0;
+}
+
+/* 列表 */
+.tech-theme ul, .tech-theme ol {
+  margin: 16px 0;
+  padding-left: 28px;
+}
+
+.tech-theme li {
+  margin: 10px 0;
+  color: #2c3e50;
+}
+
+/* 代码 */
+.tech-theme code {
+  background: #f4f4f4;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+  color: #e83e8c;
+}
+
+.tech-theme pre {
+  background: #2d2d2d;
+  color: #f8f8f2;
+  padding: 20px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 20px 0;
+}
+
+.tech-theme pre code {
+  background: transparent;
+  color: #f8f8f2;
+  padding: 0;
+}
+
+/* 强调 */
+.tech-theme strong {
+  color: #1a1a2e;
+  font-weight: 700;
+}
+
+/* 分隔线 */
+.tech-theme hr {
+  border: none;
+  border-top: 2px dashed #e0e0e0;
+  margin: 30px 0;
+}
+
+/* 图片 */
+.tech-theme img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 20px auto;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* 链接 */
+.tech-theme a {
+  color: #0f3460;
+  text-decoration: none;
+  border-bottom: 1px dotted #0f3460;
+}
+
+/* 提示框 */
+.tech-theme .tip {
+  background: #e3f2fd;
+  border-left: 4px solid #2196f3;
+  padding: 15px 20px;
+  margin: 20px 0;
+  border-radius: 0 8px 8px 0;
+}
+
+.tech-theme .warning {
+  background: #fff3e0;
+  border-left: 4px solid #ff9800;
+  padding: 15px 20px;
+  margin: 20px 0;
+  border-radius: 0 8px 8px 0;
+}
+
+/* 金句 */
+.tech-theme .golden-quote {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 20px 25px;
+  margin: 25px 0;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
