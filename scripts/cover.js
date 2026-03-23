@@ -1,8 +1,9 @@
 /**
- * 封面图片生成模块 - 调用豆包 API
+ * 封面图片生成模块 - 多租户版本
+ * 调用豆包 API
  */
 const axios = require('axios');
-const { getConfig } = require('./config');
+const { getUserConfig } = require('./config');
 
 const DOUBAO_API_URL = 'https://ark.cn-beijing.volces.com/api/v3/images/generations';
 
@@ -29,21 +30,22 @@ const STYLE_PROMPTS = {
 function generateCoverPrompt(title, style = 'creative') {
   const styleDesc = STYLE_PROMPTS[style] || STYLE_PROMPTS.creative;
   
-  const prompt = `${styleDesc}。文章主题：${title}。画面简洁，主题突出，视觉吸引力强，高清品质，不要有文字，适合作为微信公众号文章首图（横版宽屏比例，约 900×383）`;
+  const prompt = `${styleDesc}。文章主题：${title}。画面简洁，主题突出，视觉吸引力强，有视觉冲击力，高清品质，不要有文字，适合作为文章首图（横版 16:9 比例）`;
 
   return prompt;
 }
 
 /**
  * 生成封面图片
+ * @param {string} userId - 用户 ID
  * @param {string} title - 文章标题
  * @param {string} style - 风格类型
  * @returns {Promise<string>} 生成的图片 URL
  */
-async function generateCover(title, style = 'creative') {
-  const apiKey = getConfig('doubao_api_key');
+async function generateCover(userId, title, style = 'creative') {
+  const apiKey = getUserConfig(userId, 'doubao_api_key');
   if (!apiKey) {
-    throw new Error('豆包 API Key 未配置');
+    throw new Error(`用户 ${userId} 未配置豆包 API Key`);
   }
 
   const prompt = generateCoverPrompt(title, style);
@@ -56,22 +58,21 @@ async function generateCover(title, style = 'creative') {
         prompt: prompt,
         sequential_image_generation: 'disabled',
         response_format: 'url',
-        size: '2560x1440',  // 16:9 比例，满足豆包最小像素要求 (3686400)
+        size: '2560x1440',
         stream: false,
-        watermark: false   // 无水印
+        watermark: false
       },
       {
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json'
         },
-        timeout: 120000 // 2分钟超时
+        timeout: 120000
       }
     );
 
     const result = response.data;
     
-    // 根据 response_format: 'url'，返回图片 URL
     if (result.data && result.data.length > 0) {
       return result.data[0].url || '';
     }
@@ -94,7 +95,7 @@ function formatStyleOptions() {
   for (const [key, desc] of Object.entries(COVER_STYLES)) {
     lines.push(`- \`${key}\`: ${desc}`);
   }
-  lines.push('\n💡 封面尺寸：2560×1440（16:9 高清，可裁剪为公众号首图）');
+  lines.push('\n💡 封面尺寸：2560×1440（16:9 高清）');
   return lines.join('\n');
 }
 

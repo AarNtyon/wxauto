@@ -1,14 +1,14 @@
 /**
- * 混合搜索模块 - 结合 AI 自带搜索和 Brave API
+ * 混合搜索模块 - 多租户版本
+ * 结合 AI 自带搜索和 Brave API
  */
 const axios = require('axios');
-const { getConfig } = require('./config');
+const { getUserConfig } = require('./config');
 
 const BRAVE_API_URL = 'https://api.search.brave.com/res/v1/web/search';
 
 /**
  * 从 AI 自带搜索结果中提取结构化数据
- * 用于处理 Kimi SearchWeb 返回的结果
  * @param {Array} aiResults - AI 搜索结果
  * @returns {Array} 标准化的搜索结果
  */
@@ -21,20 +21,21 @@ function normalizeAIResults(aiResults) {
     title: item.title || item.name || '未命名',
     description: item.description || item.snippet || item.summary || item.content || '',
     url: item.url || item.link || item.href || '',
-    source: 'ai'  // 标记来源
+    source: 'ai'
   }));
 }
 
 /**
  * Brave API 搜索
+ * @param {string} userId - 用户 ID
  * @param {string} topic - 搜索主题
  * @param {number} count - 返回结果数量
  * @returns {Promise<Array>} 搜索结果列表
  */
-async function searchBrave(topic, count = 5) {
-  const apiKey = getConfig('brave_api_key');
+async function searchBrave(userId, topic, count = 5) {
+  const apiKey = getUserConfig(userId, 'brave_api_key');
   if (!apiKey) {
-    console.log('⚠️ Brave API Key 未配置，跳过 Brave 搜索');
+    console.log(`⚠️ 用户 ${userId} 未配置 Brave API Key，跳过 Brave 搜索`);
     return [];
   }
 
@@ -82,20 +83,21 @@ async function searchBrave(topic, count = 5) {
 
 /**
  * 混合搜索 - 结合 AI 搜索和 Brave 搜索
+ * @param {string} userId - 用户 ID
  * @param {string} topic - 搜索主题
- * @param {Array} aiResults - AI 自带搜索结果（由 Kimi SearchWeb 提供）
+ * @param {Array} aiResults - AI 自带搜索结果
  * @param {number} braveCount - Brave 搜索数量
  * @returns {Promise<Array>} 合并后的搜索结果
  */
-async function searchHybrid(topic, aiResults = [], braveCount = 5) {
-  console.log(`🔍 开始混合搜索: "${topic}"`);
+async function searchHybrid(userId, topic, aiResults = [], braveCount = 5) {
+  console.log(`🔍 [用户 ${userId}] 开始混合搜索: "${topic}"`);
   console.log(`   AI 搜索结果: ${aiResults.length} 条`);
   
   // 1. 标准化 AI 搜索结果
   const normalizedAI = normalizeAIResults(aiResults);
   
   // 2. 获取 Brave 搜索结果
-  const braveResults = await searchBrave(topic, braveCount);
+  const braveResults = await searchBrave(userId, topic, braveCount);
   
   // 3. 合并结果（去重）
   const merged = [...normalizedAI];
@@ -106,19 +108,18 @@ async function searchHybrid(topic, aiResults = [], braveCount = 5) {
       merged.push(item);
       seenUrls.add(item.url);
     } else if (!item.url) {
-      // 没有 URL 的也加入（可能是摘要信息）
       merged.push(item);
     }
   }
   
-  // 4. 排序：优先 AI 结果（通常更相关），然后 Brave
+  // 4. 排序：优先 AI 结果
   merged.sort((a, b) => {
     if (a.source === 'ai' && b.source !== 'ai') return -1;
     if (a.source !== 'ai' && b.source === 'ai') return 1;
     return 0;
   });
   
-  console.log(`✅ 混合搜索完成，共 ${merged.length} 条结果（AI: ${normalizedAI.length}, Brave: ${braveResults.length}）`);
+  console.log(`✅ 混合搜索完成，共 ${merged.length} 条结果`);
   return merged;
 }
 
@@ -156,17 +157,13 @@ function formatSearchResults(results) {
  * @returns {string} 优化后的搜索词
  */
 function optimizeSearchQuery(topic) {
-  // 添加时间限定词，获取最新信息
   const timeModifiers = ['2024', '2025', '最新'];
   
-  // 如果主题已经包含年份，不再添加
   if (/\d{4}/.test(topic)) {
     return topic;
   }
   
-  // 随机选择一个时间限定词（避免每次都一样）
   const modifier = timeModifiers[Math.floor(Math.random() * timeModifiers.length)];
-  
   return `${topic} ${modifier}`;
 }
 

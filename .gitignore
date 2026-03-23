@@ -4,7 +4,10 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
-# 配置（包含敏感信息）
+# 用户配置（多租户配置目录，包含敏感信息）
+config/
+
+# 旧版单用户配置（兼容）
 config.json
 
 # 日志
@@ -34,9 +37,7 @@ coverage/
 dist/
 build/
 
-# 临时文件和测试输出
-article_*.md
-article_*.html
+# 临时文件
 *.tmp
 .cache/
 
