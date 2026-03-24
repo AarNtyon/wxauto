@@ -11,8 +11,7 @@ const DEFAULT_CONFIG = {
   brave_api_key: '',
   doubao_api_key: '',
   wechat_appid: '',
-  wechat_secret: '',
-  kimi_api_key: ''
+  wechat_secret: ''
 };
 
 // 配置项定义
@@ -47,14 +46,6 @@ const CONFIG_FIELDS = [
     desc: '用于自动发布文章到公众号',
     help: '获取方式：微信公众平台 → 开发 → 基本配置',
     required: true,
-    validate: (val) => val.length >= 10
-  },
-  {
-    key: 'kimi_api_key',
-    name: 'Kimi API Key (可选)',
-    desc: '用于本地测试时生成文章（MCP 环境不需要）',
-    help: '获取方式：https://platform.moonshot.cn/ → API Key 管理',
-    required: false,
     validate: (val) => val.length >= 10
   }
 ];

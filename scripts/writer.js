@@ -205,57 +205,8 @@ function extractGoldenSentences(content) {
   return [...new Set(matches)].slice(0, 3); // 去重，最多3个
 }
 
-/**
- * 使用 AI 生成文章
- * @param {string} userId - 用户 ID
- * @param {string} topic - 文章主题
- * @param {Object} searchResults - 搜索结果
- * @returns {Promise<Object>} 文章对象 {title, digest, content, interactionHook}
- */
-async function writeArticle(userId, topic, searchResults) {
-  const { getUserConfig } = require('./config');
-  
-  // 生成提示词
-  const prompt = generateArticlePrompt(topic, searchResults);
-  
-  // 获取 Kimi API Key（配置或环境变量）
-  const apiKey = getUserConfig(userId, 'kimi_api_key') || process.env.KIMI_API_KEY;
-  if (!apiKey) {
-    throw new Error('未设置 Kimi API Key。请在配置中设置 kimi_api_key，或设置 KIMI_API_KEY 环境变量。');
-  }
-  
-  const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'kimi-k2-0711-preview',
-      messages: [
-        { role: 'system', content: '你是专业的技术公众号作者，擅长撰写高质量的技术文章。' },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.7,
-      max_tokens: 8000
-    })
-  });
-  
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`AI 生成失败: ${error}`);
-  }
-  
-  const data = await response.json();
-  const output = data.choices[0].message.content;
-  
-  // 解析输出
-  return parseArticleOutput(output);
-}
-
 module.exports = {
   generateArticlePrompt,
   parseArticleOutput,
-  extractGoldenSentences,
-  writeArticle
+  extractGoldenSentences
 };
