@@ -7,12 +7,21 @@ const { getUserConfig } = require('./config');
 
 const WECHAT_API_BASE = 'https://api.weixin.qq.com/cgi-bin';
 
+// access_token 缓存（按 userId 隔离，有效期 110 分钟）
+const tokenCache = {};
+
 /**
- * 获取微信 access_token
+ * 获取微信 access_token（带缓存）
  * @param {string} userId - 用户 ID
  * @returns {Promise<string>} access_token
  */
 async function getAccessToken(userId) {
+  // 检查缓存是否有效
+  const cached = tokenCache[userId];
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.token;
+  }
+
   const appid = getUserConfig(userId, 'wechat_appid');
   const secret = getUserConfig(userId, 'wechat_secret');
 
@@ -32,6 +41,11 @@ async function getAccessToken(userId) {
 
     const data = response.data;
     if (data.access_token) {
+      // 缓存 token，有效期设为 110 分钟（微信默认 2 小时，提前 10 分钟过期）
+      tokenCache[userId] = {
+        token: data.access_token,
+        expiresAt: Date.now() + 110 * 60 * 1000
+      };
       return data.access_token;
     } else {
       throw new Error(`获取 access_token 失败: ${JSON.stringify(data)}`);

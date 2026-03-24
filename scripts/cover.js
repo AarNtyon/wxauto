@@ -74,7 +74,11 @@ async function generateCover(userId, title, style = 'creative') {
     const result = response.data;
     
     if (result.data && result.data.length > 0) {
-      return result.data[0].url || '';
+      const imageUrl = result.data[0].url;
+      if (!imageUrl) {
+        throw new Error('封面生成成功但未返回图片 URL，请重试');
+      }
+      return imageUrl;
     }
 
     throw new Error(`封面生成失败: ${JSON.stringify(result)}`);

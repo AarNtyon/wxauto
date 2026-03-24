@@ -123,78 +123,50 @@ ${searchContext}
 4. 金句：2-3 个，使用红色 <strong> 标签
 5. 引用：至少 1 处重点引用框
 
-**输出格式**：
+**输出格式（严格按照以下 XML 标签输出，不要加任何其他内容）**：
 
-标题：[文章标题]
-
-摘要：[一句话摘要，50字以内]
-
-正文：
+<title>文章标题</title>
+<digest>一句话摘要，50字以内</digest>
+<content>
 [直接输出 HTML，section > p 结构，全内联样式]
-
-互动钩子：
-[引导评论的话术]`;
+</content>
+<hook>引导评论的话术</hook>`;
 
   return prompt;
 }
 
 /**
- * 解析 AI 生成的文章内容
+ * 解析 AI 生成的文章内容（仅支持 XML 标签格式）
+ * @throws {Error} 解析失败时抛出错误
  */
 function parseArticleOutput(output) {
   if (!output || typeof output !== 'string') {
-    return { title: '', digest: '', content: '', interactionHook: '' };
+    throw new Error('AI 输出为空，无法解析文章内容');
   }
-  
-  // 尝试 XML 标签格式
+
+  // 统一解析 XML 标签格式
   const titleMatch = output.match(/<title>([\s\S]*?)<\/title>/);
   const digestMatch = output.match(/<digest>([\s\S]*?)<\/digest>/);
   const contentMatch = output.match(/<content>([\s\S]*?)<\/content>/);
-  const hookMatch = output.match(/<interactionHook>([\s\S]*?)<\/interactionHook>/);
-  
-  if (titleMatch || digestMatch || contentMatch) {
-    return {
-      title: titleMatch ? titleMatch[1].trim() : '',
-      digest: digestMatch ? digestMatch[1].trim() : '',
-      content: contentMatch ? contentMatch[1].trim() : '',
-      interactionHook: hookMatch ? hookMatch[1].trim() : ''
-    };
-  }
-  
-  // 回退到文本格式解析
-  const lines = output.trim().split('\n');
-  
-  let title = '';
-  let digest = '';
-  const contentLines = [];
-  let interactionHook = '';
-  let inContent = false;
-  let inHook = false;
+  const hookMatch = output.match(/<hook>([\s\S]*?)<\/hook>/);
 
-  for (const line of lines) {
-    if (line.startsWith('标题：') || line.startsWith('标题:')) {
-      const sep = line.includes('：') ? '：' : ':';
-      title = line.split(sep).slice(1).join(sep).trim();
-    } else if (line.startsWith('摘要：') || line.startsWith('摘要:')) {
-      const sep = line.includes('：') ? '：' : ':';
-      digest = line.split(sep).slice(1).join(sep).trim();
-    } else if (line.startsWith('正文：') || line.startsWith('正文:')) {
-      inContent = true;
-      inHook = false;
-    } else if (line.startsWith('互动钩子：') || line.startsWith('互动钩子:')) {
-      inContent = false;
-      inHook = true;
-    } else if (inContent) {
-      contentLines.push(line);
-    } else if (inHook) {
-      interactionHook += line + '\n';
-    }
+  const title = titleMatch ? titleMatch[1].trim() : '';
+  const content = contentMatch ? contentMatch[1].trim() : '';
+
+  // 标题或正文缺失则视为解析失败
+  if (!title || !content) {
+    throw new Error(
+      `AI 输出格式不符合要求（缺少 ${!title ? '<title>' : ''} ${!content ? '<content>' : ''} 标签）。` +
+      `请确保 AI 按照指定的 XML 格式输出。`
+    );
   }
 
-  const content = contentLines.join('\n').trim();
-  interactionHook = interactionHook.trim();
-
-  return { title, digest, content, interactionHook };
+  return {
+    title,
+    digest: digestMatch ? digestMatch[1].trim() : '',
+    content,
+    interactionHook: hookMatch ? hookMatch[1].trim() : ''
+  };
 }
 
 /**
