@@ -1,311 +1,299 @@
 /**
- * 公众号格式编排模块 - 微信公众号文章格式化工具
- * 将 Markdown/纯文本转换为公众号兼容的 HTML
+ * 公众号格式编排模块 - 微信公众号最佳实践版本
+ * 遵循微信富文本白名单环境设计
+ * 核心原则：少标签、少层级、全内联样式、单列布局
  */
 
-// 排版样式配置
-const STYLES = {
-  paragraph: 'font-size: 17px; line-height: 2.0; letter-spacing: 0.5px; color: #3f3f3f; margin-bottom: 24px; text-align: justify;',
-  h2: 'font-size: 18px; font-weight: 600; color: #1a1a1a; margin: 40px 0 20px 0; padding-left: 12px; border-left: 4px solid #d9230f;',
-  h3: 'font-size: 16px; font-weight: 600; color: #1a1a1a; margin: 32px 0 16px 0;',
-  strong: 'color: #d9230f; font-weight: 600;',
-  blockquote: 'background: #f8f9fa; padding: 20px; margin: 32px 0; border-radius: 8px; border-left: 4px solid #999;',
-  blockquoteP: 'font-size: 16px; color: #555; font-style: italic; margin: 0;',
-  ul: 'margin: 0 0 24px 0; padding-left: 24px;',
-  li: 'font-size: 17px; line-height: 2.0; color: #3f3f3f; margin-bottom: 12px;',
-  title: 'font-size: 24px; font-weight: 600; color: #1a1a1a; line-height: 1.5; margin: 0 0 16px 0;',
-  author: 'font-size: 15px; color: #333; font-weight: 500;',
-  authorWrapper: 'display: flex; align-items: center; margin-bottom: 32px; padding-bottom: 20px; border-bottom: 1px solid #e8e8e8;',
-  lead: 'background: #f8f9fa; border-left: 4px solid #d9230f; padding: 20px; margin-bottom: 32px; border-radius: 0 8px 8px 0;',
-  leadP: 'font-size: 16px; color: #555; line-height: 1.8; margin: 0; font-style: italic;'
+// 微信公众号 HTML 模板配置
+const TEMPLATES = {
+  // 文章外层容器
+  wrapper: (content) => `<section style="padding:0 16px; box-sizing:border-box;">${content}</section>`,
+  
+  // 主标题
+  mainTitle: (text) => `
+<section style="margin:24px 0 16px 0;">
+  <p style="margin:0; font-size:24px; line-height:1.4; font-weight:700; color:#111111;">${escapeHtml(text)}</p>
+</section>`,
+  
+  // 作者信息
+  author: (text) => `
+<section style="margin:0 0 20px 0;">
+  <p style="margin:0; font-size:14px; line-height:1.6; color:#888888;">${escapeHtml(text)}</p>
+</section>`,
+  
+  // 一级标题（章节标题）
+  h1: (text) => `
+<section style="margin:28px 0 12px 0;">
+  <p style="margin:0; font-size:20px; line-height:1.5; font-weight:700; color:#1a1a1a;">${escapeHtml(text)}</p>
+</section>`,
+  
+  // 二级标题
+  h2: (text) => `
+<section style="margin:24px 0 10px 0;">
+  <p style="margin:0; font-size:18px; line-height:1.5; font-weight:700; color:#222222;">${escapeHtml(text)}</p>
+</section>`,
+  
+  // 正文段落
+  paragraph: (text) => `
+<section style="margin:0 0 18px 0;">
+  <p style="margin:0 0 14px 0; font-size:16px; line-height:1.85; color:#333333;">${formatInline(text)}</p>
+</section>`,
+  
+  // 引用块（重点提示）
+  blockquote: (text) => `
+<section style="padding:14px 16px; background-color:#f7f7f7; border-left:4px solid #d9230f; margin:18px 0;">
+  <p style="margin:0; font-size:15px; line-height:1.8; color:#555555;">${escapeHtml(text)}</p>
+</section>`,
+  
+  // 高亮框
+  highlight: (text) => `
+<section style="padding:14px 16px; background-color:#fff8f0; border-radius:8px; margin:18px 0;">
+  <p style="margin:0; font-size:15px; line-height:1.8; color:#d9730f;">${escapeHtml(text)}</p>
+</section>`,
+  
+  // 列表项（使用段落模拟）
+  listItem: (index, text) => `
+<section style="margin:0 0 10px 0;">
+  <p style="margin:0; font-size:16px; line-height:1.8; color:#333333;"><span style="color:#d9230f; font-weight:700;">${index}</span> ${formatInline(text)}</p>
+</section>`,
+  
+  // CTA 按钮块
+  cta: (text) => `
+<section style="text-align:center; margin:28px 0 8px 0;">
+  <span style="display:inline-block; padding:10px 20px; background-color:#d9230f; color:#ffffff; font-size:15px; line-height:1.4; border-radius:999px;">${escapeHtml(text)}</span>
+</section>`,
+  
+  // 分隔线
+  divider: () => `
+<section style="margin:24px 0;">
+  <p style="margin:0; height:1px; background-color:#e8e8e8;"></p>
+</section>`,
+  
+  // 图片
+  image: (src, alt) => `
+<section style="margin:18px 0;">
+  <img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" style="display:block; width:100%; height:auto; border-radius:8px;" />
+</section>`
 };
 
 /**
- * WechatFormatter 类 - 微信公众号文章格式化器
+ * HTML 转义
  */
-class WechatFormatter {
-  constructor() {
-    this._codeBlocks = [];
-  }
+function escapeHtml(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
-  /**
-   * 格式化文本为公众号 HTML
-   * @param {string} text - 输入文本
-   * @returns {string} 格式化后的 HTML
-   */
-  format(text) {
-    // 清理文本
-    text = text.trim();
+/**
+ * 格式化行内文本（加粗、斜体）
+ */
+function formatInline(text) {
+  if (!text) return '';
+  
+  // 转义 HTML
+  let result = escapeHtml(text);
+  
+  // 加粗 **text** -> <strong style="color:#d9230f; font-weight:700;">text</strong>
+  result = result.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#d9230f; font-weight:700;">$1</strong>');
+  
+  // 斜体 *text* -> <em style="font-style:italic; color:#555;">text</em>
+  result = result.replace(/\*([^*]+)\*/g, '<em style="font-style:italic; color:#555;">$1</em>');
+  
+  return result;
+}
 
-    // 保护代码块
-    text = this._protectCodeBlocks(text);
-
-    // 转换标题
-    text = this._convertHeaders(text);
-
-    // 转换列表
-    text = this._convertLists(text);
-
-    // 转换引用块
-    text = this._convertBlockquotes(text);
-
-    // 转换加粗
-    text = this._convertBold(text);
-
-    // 转换段落
-    text = this._convertParagraphs(text);
-
-    // 恢复代码块
-    text = this._restoreCodeBlocks(text);
-
-    return text.trim();
-  }
-
-  /**
-   * 保护代码块不被处理
-   * @param {string} text - 原文本
-   * @returns {string} 保护后的文本
-   */
-  _protectCodeBlocks(text) {
-    this._codeBlocks = [];
-
-    // 保护 ``` 代码块
-    text = text.replace(/```[\s\S]*?```/g, (match) => {
-      this._codeBlocks.push(match);
-      return `<!--CODE_BLOCK_${this._codeBlocks.length - 1}-->`;
-    });
-
-    // 保护 ` 行内代码
-    text = text.replace(/`([^`]+)`/g, (match) => {
-      this._codeBlocks.push(match);
-      return `<!--CODE_BLOCK_${this._codeBlocks.length - 1}-->`;
-    });
-
-    return text;
-  }
-
-  /**
-   * 恢复代码块
-   * @param {string} text - 文本
-   * @returns {string} 恢复后的文本
-   */
-  _restoreCodeBlocks(text) {
-    for (let i = 0; i < this._codeBlocks.length; i++) {
-      text = text.replace(`<!--CODE_BLOCK_${i}-->`, this._codeBlocks[i]);
+/**
+ * 解析 Markdown 并转换为公众号 HTML
+ * @param {string} markdown - Markdown 内容
+ * @returns {string} 公众号兼容的 HTML
+ */
+function markdownToWechatHtml(markdown) {
+  if (!markdown) return '';
+  
+  const lines = markdown.trim().split('\n');
+  const sections = [];
+  let i = 0;
+  
+  while (i < lines.length) {
+    const line = lines[i].trim();
+    
+    // 空行跳过
+    if (!line) {
+      i++;
+      continue;
     }
-    return text;
-  }
-
-  /**
-   * 转换 Markdown 标题为 HTML
-   * @param {string} text - 文本
-   * @returns {string} 转换后的文本
-   */
-  _convertHeaders(text) {
-    // ## 二级标题 → 带红色边框
-    text = text.replace(/^##\s*(.+)$/gm, (match, p1) => {
-      return `<h2 style="${STYLES.h2}">${p1.trim()}</h2>`;
-    });
-
-    // ### 三级标题
-    text = text.replace(/^###\s*(.+)$/gm, (match, p1) => {
-      return `<h3 style="${STYLES.h3}">${p1.trim()}</h3>`;
-    });
-
-    return text;
-  }
-
-  /**
-   * 转换无序列表
-   * @param {string} text - 文本
-   * @returns {string} 转换后的文本
-   */
-  _convertLists(text) {
-    const lines = text.split('\n');
-    const result = [];
-    let inList = false;
-    let listItems = [];
-
-    for (const line of lines) {
-      const listMatch = line.match(/^[\s]*[-*+]\s+(.+)$/);
-      if (listMatch) {
-        if (!inList) {
-          inList = true;
-          listItems = [];
-        }
-        let content = listMatch[1];
-        // 处理列表项内的加粗
-        content = this._convertInlineBold(content);
-        listItems.push(`<li style="${STYLES.li}">${content}</li>`);
-      } else {
-        if (inList) {
-          result.push(`<ul style="${STYLES.ul}">\n    ${listItems.join('\n    ')}\n</ul>`);
-          inList = false;
-          listItems = [];
-        }
-        result.push(line);
+    
+    // 主标题 #
+    if (line.startsWith('# ')) {
+      const text = line.substring(2).trim();
+      sections.push(TEMPLATES.mainTitle(text));
+      i++;
+      continue;
+    }
+    
+    // 一级标题 ##
+    if (line.startsWith('## ')) {
+      const text = line.substring(3).trim();
+      sections.push(TEMPLATES.h1(text));
+      i++;
+      continue;
+    }
+    
+    // 二级标题 ###
+    if (line.startsWith('### ')) {
+      const text = line.substring(4).trim();
+      sections.push(TEMPLATES.h2(text));
+      i++;
+      continue;
+    }
+    
+    // 引用块 >
+    if (line.startsWith('> ')) {
+      const quoteLines = [];
+      while (i < lines.length && lines[i].trim().startsWith('> ')) {
+        quoteLines.push(lines[i].trim().substring(2));
+        i++;
       }
+      sections.push(TEMPLATES.blockquote(quoteLines.join(' ')));
+      continue;
     }
-
-    if (inList) {
-      result.push(`<ul style="${STYLES.ul}">\n    ${listItems.join('\n    ')}\n</ul>`);
+    
+    // 高亮块 [!TIP]
+    if (line.startsWith('[!TIP]') || line.startsWith('[!NOTE]')) {
+      const tipText = line.substring(line.indexOf(']') + 1).trim();
+      sections.push(TEMPLATES.highlight(tipText || '重点提示'));
+      i++;
+      continue;
     }
-
-    return result.join('\n');
-  }
-
-  /**
-   * 转换引用块
-   * @param {string} text - 文本
-   * @returns {string} 转换后的文本
-   */
-  _convertBlockquotes(text) {
-    const lines = text.split('\n');
-    const result = [];
-    let inQuote = false;
-    let quoteLines = [];
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith('>')) {
-        if (!inQuote) {
-          inQuote = true;
-          quoteLines = [];
-        }
-        quoteLines.push(trimmed.slice(1).trim());
-      } else {
-        if (inQuote) {
-          let quoteContent = quoteLines.join(' ');
-          quoteContent = this._convertInlineBold(quoteContent);
-          result.push(`<blockquote style="${STYLES.blockquote}">\n    <p style="${STYLES.blockquoteP}">${quoteContent}</p>\n</blockquote>`);
-          inQuote = false;
-          quoteLines = [];
-        }
-        result.push(line);
+    
+    // 无序列表 - 或 *
+    if (line.match(/^[-*]\s/)) {
+      const listSections = [];
+      let index = 1;
+      while (i < lines.length && lines[i].trim().match(/^[-*]\s/)) {
+        const itemText = lines[i].trim().substring(2);
+        listSections.push(TEMPLATES.listItem(`${index}.`, itemText));
+        index++;
+        i++;
       }
+      sections.push(listSections.join(''));
+      continue;
     }
-
-    if (inQuote) {
-      let quoteContent = quoteLines.join(' ');
-      quoteContent = this._convertInlineBold(quoteContent);
-      result.push(`<blockquote style="${STYLES.blockquote}">\n    <p style="${STYLES.blockquoteP}">${quoteContent}</p>\n</blockquote>`);
-    }
-
-    return result.join('\n');
-  }
-
-  /**
-   * 转换加粗文本
-   * @param {string} text - 文本
-   * @returns {string} 转换后的文本
-   */
-  _convertBold(text) {
-    return this._convertInlineBold(text);
-  }
-
-  /**
-   * 转换行内加粗
-   * @param {string} text - 文本
-   * @returns {string} 转换后的文本
-   */
-  _convertInlineBold(text) {
-    return text.replace(/\*\*(.+?)\*\*/g, (match, p1) => {
-      return `<strong style="${STYLES.strong}">${p1}</strong>`;
-    });
-  }
-
-  /**
-   * 转换段落
-   * @param {string} text - 文本
-   * @returns {string} 转换后的文本
-   */
-  _convertParagraphs(text) {
-    const lines = text.split('\n');
-    const result = [];
-    let currentPara = [];
-
-    for (const line of lines) {
-      const stripped = line.trim();
-
-      // 跳过空行和已经是 HTML 标签的行
-      if (!stripped || (stripped.startsWith('<') && stripped.endsWith('>'))) {
-        if (currentPara.length > 0) {
-          let paraText = currentPara.join(' ');
-          paraText = this._convertInlineBold(paraText);
-          result.push(`<p style="${STYLES.paragraph}">${paraText}</p>`);
-          currentPara = [];
+    
+    // 有序列表 1.
+    if (line.match(/^\d+\.\s/)) {
+      const listSections = [];
+      while (i < lines.length && lines[i].trim().match(/^\d+\.\s/)) {
+        const match = lines[i].trim().match(/^(\d+)\.\s(.+)/);
+        if (match) {
+          listSections.push(TEMPLATES.listItem(`${match[1]}.`, match[2]));
         }
-        if (stripped) {
-          result.push(line);
-        }
-      } else {
-        currentPara.push(stripped);
+        i++;
       }
+      sections.push(listSections.join(''));
+      continue;
     }
-
-    if (currentPara.length > 0) {
-      let paraText = currentPara.join(' ');
-      paraText = this._convertInlineBold(paraText);
-      result.push(`<p style="${STYLES.paragraph}">${paraText}</p>`);
+    
+    // CTA 按钮 [按钮文字]
+    if (line.startsWith('[') && line.endsWith(']') && line.length > 2) {
+      const btnText = line.slice(1, -1);
+      sections.push(TEMPLATES.cta(btnText));
+      i++;
+      continue;
     }
-
-    return result.join('\n\n');
-  }
-
-  /**
-   * 添加标题和作者信息
-   * @param {string} html - HTML 内容
-   * @param {string} title - 标题
-   * @param {string} author - 作者（可选）
-   * @returns {string} 完整的 HTML
-   */
-  addTitle(html, title, author = '') {
-    let header = `<h1 style="${STYLES.title}">${title}</h1>\n\n`;
-
-    if (author) {
-      header += `<div style="${STYLES.authorWrapper}">\n    <div style="${STYLES.author}">${author}</div>\n</div>\n\n`;
+    
+    // 分隔线 ---
+    if (line === '---' || line === '***') {
+      sections.push(TEMPLATES.divider());
+      i++;
+      continue;
     }
-
-    return header + html;
+    
+    // 图片 ![alt](url)
+    if (line.startsWith('![')) {
+      const match = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
+      if (match) {
+        sections.push(TEMPLATES.image(match[2], match[1]));
+      }
+      i++;
+      continue;
+    }
+    
+    // 普通段落
+    const paraLines = [];
+    while (i < lines.length && lines[i].trim() && !lines[i].trim().match(/^[#>\-\*\d!\[]/)) {
+      paraLines.push(lines[i].trim());
+      i++;
+    }
+    if (paraLines.length > 0) {
+      sections.push(TEMPLATES.paragraph(paraLines.join(' ')));
+    }
+    
+    i++;
   }
+  
+  return sections.join('\n');
+}
 
-  /**
-   * 添加导语/引言
-   * @param {string} html - HTML 内容
-   * @param {string} leadText - 导语内容
-   * @returns {string} 完整的 HTML
-   */
-  addLead(html, leadText) {
-    const lead = `<div style="${STYLES.lead}">\n    <p style="${STYLES.leadP}">${leadText}</p>\n</div>\n\n`;
-    return lead + html;
+/**
+ * 生成完整的公众号文章 HTML
+ * @param {string} title - 文章标题
+ * @param {string} content - Markdown 内容
+ * @param {string} author - 作者（可选）
+ * @param {string} lead - 导语/摘要（可选）
+ * @returns {string} 完整的公众号 HTML
+ */
+function generateFullArticle(title, content, author = '', lead = '') {
+  const sections = [];
+  
+  // 主标题
+  sections.push(TEMPLATES.mainTitle(title));
+  
+  // 作者信息
+  if (author) {
+    sections.push(TEMPLATES.author(author));
   }
+  
+  // 分隔线
+  sections.push(TEMPLATES.divider());
+  
+  // 导语（如果有）
+  if (lead) {
+    sections.push(TEMPLATES.highlight(lead));
+  }
+  
+  // 正文内容
+  sections.push(markdownToWechatHtml(content));
+  
+  // 包装外层容器
+  return TEMPLATES.wrapper(sections.join('\n'));
 }
 
 /**
  * 快速格式化函数
- * @param {string} text - 输入文本
+ * @param {string} content - Markdown 内容
  * @param {Object} options - 选项 { title, author, lead }
- * @returns {string} 格式化后的 HTML
+ * @returns {string} 完整的公众号 HTML
  */
-function formatToHtml(text, options = {}) {
-  const formatter = new WechatFormatter();
-  let html = formatter.format(text);
-
-  // 添加导语
-  if (options.lead) {
-    html = formatter.addLead(html, options.lead);
-  }
-
-  // 添加标题和作者
-  if (options.title) {
-    html = formatter.addTitle(html, options.title, options.author);
-  }
-
-  return html;
+function formatToHtml(content, options = {}) {
+  return generateFullArticle(
+    options.title || '无标题',
+    content,
+    options.author,
+    options.lead
+  );
 }
 
 module.exports = {
-  WechatFormatter,
+  markdownToWechatHtml,
+  generateFullArticle,
   formatToHtml,
-  STYLES
+  TEMPLATES,
+  escapeHtml,
+  formatInline
 };
