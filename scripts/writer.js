@@ -146,6 +146,22 @@ function parseArticleOutput(output) {
     return { title: '', digest: '', content: '', interactionHook: '' };
   }
   
+  // 尝试 XML 标签格式
+  const titleMatch = output.match(/<title>([\s\S]*?)<\/title>/);
+  const digestMatch = output.match(/<digest>([\s\S]*?)<\/digest>/);
+  const contentMatch = output.match(/<content>([\s\S]*?)<\/content>/);
+  const hookMatch = output.match(/<interactionHook>([\s\S]*?)<\/interactionHook>/);
+  
+  if (titleMatch || digestMatch || contentMatch) {
+    return {
+      title: titleMatch ? titleMatch[1].trim() : '',
+      digest: digestMatch ? digestMatch[1].trim() : '',
+      content: contentMatch ? contentMatch[1].trim() : '',
+      interactionHook: hookMatch ? hookMatch[1].trim() : ''
+    };
+  }
+  
+  // 回退到文本格式解析
   const lines = output.trim().split('\n');
   
   let title = '';
