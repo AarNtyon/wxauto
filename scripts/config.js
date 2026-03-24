@@ -11,7 +11,8 @@ const DEFAULT_CONFIG = {
   brave_api_key: '',
   doubao_api_key: '',
   wechat_appid: '',
-  wechat_secret: ''
+  wechat_secret: '',
+  kimi_api_key: ''
 };
 
 // 配置项定义
@@ -46,6 +47,14 @@ const CONFIG_FIELDS = [
     desc: '用于自动发布文章到公众号',
     help: '获取方式：微信公众平台 → 开发 → 基本配置',
     required: true,
+    validate: (val) => val.length >= 10
+  },
+  {
+    key: 'kimi_api_key',
+    name: 'Kimi API Key (可选)',
+    desc: '用于本地测试时生成文章（MCP 环境不需要）',
+    help: '获取方式：https://platform.moonshot.cn/ → API Key 管理',
+    required: false,
     validate: (val) => val.length >= 10
   }
 ];
@@ -84,6 +93,17 @@ function loadUserConfig(userId) {
     console.error(`加载用户 ${userId} 配置失败:`, error.message);
     return { ...DEFAULT_CONFIG };
   }
+}
+
+/**
+ * 获取用户配置的单个值（兼容接口）
+ * @param {string} userId - 用户 ID
+ * @param {string} key - 配置键名
+ * @returns {string|undefined} 配置值
+ */
+function getUserConfig(userId, key) {
+  const config = loadUserConfig(userId);
+  return config[key];
 }
 
 /**
@@ -370,6 +390,7 @@ module.exports = {
   // 核心功能
   loadUserConfig,
   saveUserConfig,
+  getUserConfig,
   checkMissingConfig,
   validateConfigField,
   isFirstTime,
