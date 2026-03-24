@@ -7,7 +7,7 @@ const { checkConfig, initConfigInteractive } = require('./scripts/config');
 const { searchTopic, formatSearchResults } = require('./scripts/search');
 const { generateArticlePrompt, parseArticleOutput, extractGoldenSentences } = require('./scripts/writer');
 const { formatStyleOptions, generateCover } = require('./scripts/cover');
-const { markdownToWechatHtml } = require('./scripts/formatter');
+const { formatToHtml, generateFullArticle, markdownToWechatHtml } = require('./scripts/formatter');
 const { publishDraft } = require('./scripts/publisher');
 
 async function main() {
@@ -41,6 +41,8 @@ module.exports = {
   extractGoldenSentences,
   formatStyleOptions,
   generateCover,
+  formatToHtml,
+  generateFullArticle,
   markdownToWechatHtml,
   publishDraft
 };

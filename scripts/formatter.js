@@ -42,33 +42,36 @@ function formatInline(text) {
  * @param {string} content - AI 生成的 HTML 内容
  * @param {string} author - 作者（可选）
  * @param {string} lead - 导语/摘要（可选）
+ * @param {boolean} includeHeader - 是否包含标题和作者（发布到草稿箱时为 false）
  * @returns {string} 完整的公众号 HTML
  */
-function generateFullArticle(title, content, author = '', lead = '') {
+function generateFullArticle(title, content, author = '', lead = '', includeHeader = true) {
   const sections = [];
   
   // 外层容器
   sections.push('<section style="padding:0 16px; box-sizing:border-box;">');
   
-  // 主标题
-  sections.push(`
+  // 主标题（仅在需要时添加）
+  if (includeHeader) {
+    sections.push(`
 <section style="margin:24px 0 16px 0;">
   <p style="margin:0; font-size:24px; line-height:1.4; font-weight:700; color:#111111;">${escapeHtml(title)}</p>
 </section>`);
-  
-  // 作者信息
-  if (author) {
-    sections.push(`
+    
+    // 作者信息
+    if (author) {
+      sections.push(`
 <section style="margin:0 0 20px 0;">
   <p style="margin:0; font-size:14px; line-height:1.6; color:#888888;">${escapeHtml(author)}</p>
 </section>`);
-  }
-  
-  // 分隔线
-  sections.push(`
+    }
+    
+    // 分隔线
+    sections.push(`
 <section style="margin:24px 0;">
   <p style="margin:0; height:1px; background-color:#e8e8e8;"></p>
 </section>`);
+  }
   
   // 导语（如果有）
   if (lead) {
@@ -96,7 +99,7 @@ function generateFullArticle(title, content, author = '', lead = '') {
 /**
  * 快速格式化函数
  * @param {string} content - AI 生成的 HTML 内容
- * @param {Object} options - 选项 { title, author, lead }
+ * @param {Object} options - 选项 { title, author, lead, includeHeader }
  * @returns {string} 完整的公众号 HTML
  */
 function formatToHtml(content, options = {}) {
@@ -104,7 +107,8 @@ function formatToHtml(content, options = {}) {
     options.title || '无标题',
     content,
     options.author,
-    options.lead
+    options.lead,
+    options.includeHeader !== false  // 默认 true，发布到草稿箱时设为 false
   );
 }
 
