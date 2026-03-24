@@ -2,16 +2,17 @@
 /**
  * 微信公众号自动化发布 Skill - 主入口
  * 
- * 使用方式（AI 调用）：
- * 1. const skill = require('/Users/an/code/wxauto');
- * 2. await skill.runWorkflow(userId, topic, callbacks);
+ * AI 使用方法：
+ * const skill = require('/Users/an/code/wxauto');
+ * await skill.runWorkflow(userId, topic, { sendMessage, askAI, askUser });
+ * 
+ * ⚠️ 警告：不要直接调用 scripts/ 目录下的函数，使用 runWorkflow 即可
  */
 
 const { 
   getConfigStatus, 
   generateWelcomeMessage, 
   forceCompleteConfig,
-  checkCanUse,
   loadUserConfig
 } = require('./scripts/config');
 
@@ -29,20 +30,7 @@ const { publishDraft } = require('./scripts/publisher');
  * @param {Function} callbacks.sendMessage - 发送消息给用户
  * @param {Function} callbacks.askAI - 调用 AI 生成文章（传入 prompt，返回文章文本）
  * @param {Function} callbacks.askUser - 询问用户（传入问题，返回答案）
- * @returns {Promise<Object>} 发布结果
- * 
- * 示例：
- * await skill.runWorkflow('user_123', 'AI 编程助手', {
- *   sendMessage: async (msg) => console.log(msg),
- *   askAI: async (prompt) => { 
- *     // AI 生成文章内容
- *     return await ai.chat({ messages: [{ role: 'user', content: prompt }] });
- *   },
- *   askUser: async (question) => {
- *     // 等待用户回复
- *     return await waitForUserReply(question);
- *   }
- * });
+ * @returns {Promise<Object>} 发布结果 { media_id, url }
  */
 async function runWorkflow(userId, topic, callbacks) {
   const { sendMessage, askAI, askUser } = callbacks;
@@ -115,24 +103,9 @@ async function runWorkflow(userId, topic, callbacks) {
 }
 
 /**
- * 快速发布（配置已完成用户使用）
- * @param {string} userId - 用户 ID
- * @param {string} topic - 文章主题
- * @param {Function} sendMessage - 发送消息函数
- * @param {Function} askAI - AI 生成函数
- */
-async function quickPublish(userId, topic, sendMessage, askAI) {
-  return await runWorkflow(userId, topic, {
-    sendMessage,
-    askAI,
-    askUser: async (q) => { throw new Error('配置已完成，不需要询问'); }
-  });
-}
-
-/**
  * 检查用户是否可以使用
  * @param {string} userId - 用户 ID
- * @returns {Object} { canUse: boolean, reason?: string }
+ * @returns {Object} { canUse: boolean, progress: string, missing: string[] }
  */
 function checkUserReady(userId) {
   const status = getConfigStatus(userId);
@@ -144,23 +117,18 @@ function checkUserReady(userId) {
   };
 }
 
-// 保持向后兼容的导出
+// 只导出两个函数给 AI 使用
 module.exports = {
-  // 主要 API（AI 应该使用这些）
+  // AI 应该使用的函数
   runWorkflow,      // 完整工作流
-  quickPublish,     // 快速发布
   checkUserReady,   // 检查用户是否就绪
   
-  // 底层函数（高级自定义使用）
-  getConfigStatus,
-  generateWelcomeMessage,
-  forceCompleteConfig,
-  checkCanUse,
-  loadUserConfig,
-  searchHybrid,
-  generateArticlePrompt,
-  parseArticleOutput,
-  formatToHtml,
-  generateCover,
-  publishDraft
+  // 为了向后兼容，保留底层函数但不推荐使用
+  // ⚠️ 不要直接调用这些函数，使用 runWorkflow 即可
+  searchHybrid: require('./scripts/search').searchHybrid,
+  generateArticlePrompt: require('./scripts/writer').generateArticlePrompt,
+  parseArticleOutput: require('./scripts/writer').parseArticleOutput,
+  formatToHtml: require('./scripts/formatter').formatToHtml,
+  generateCover: require('./scripts/cover').generateCover,
+  publishDraft: require('./scripts/publisher').publishDraft
 };
